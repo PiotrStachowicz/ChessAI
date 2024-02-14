@@ -1,0 +1,433 @@
+
+class Piece;
+using std::vector;
+using std::string;
+using std::map;
+using std::min;
+using std::array;
+
+class Move {
+public:
+    int start;
+    int end;
+    Piece& startPiece;
+    Piece& endPiece;
+    bool castle;
+    bool passant;
+
+    Move(int start, int anEnd, Piece& startPiece, Piece& endPiece, bool castle, bool passant) : start(start),
+                                                                                                end(anEnd),
+                                                                                                startPiece(startPiece),
+                                                                                                endPiece(endPiece),
+                                                                                                castle(castle),
+                                                                                                passant(passant) {}
+
+    bool operator==(const Move &move1) const {
+        return start == move1.start && end == move1.end && passant == move1.passant &&
+               castle == move1.castle;
+    }
+};
+
+class Piece {
+public:
+    // Types
+    static const int None = 0;
+    static const int Pawn = 1;
+    static const int Knight = 2;
+    static const int Bishop = 3;
+    static const int Rook = 4;
+    static const int Queen = 5;
+    static const int King = 6;
+    static const int White = 8;
+    static const int Black = 16;
+
+    // Functionality
+    int position;
+    int ID;
+    int color;
+    int type;
+    bool alive;
+    unsigned int moves;
+
+    Piece(int position, int ID, int color, int type, bool alive = true, unsigned int moves = 0) :
+            position(position), ID(ID), color(color), type(type), alive(alive), moves(moves) {};
+
+    void MovePiece(Move move) {
+        position = move.end;
+        moves++;
+    }
+
+    void KillPiece() {
+        alive = false;
+        position = -1;
+    }
+
+    [[nodiscard]] bool CanMove(int turn) const {
+        return (turn == color) && alive;
+    }
+};
+
+// left-right-up-down-tl-tr-bl-br
+static const std::array<int, 8> Directions = {-1, 1, -8, 8, -9, -7, 7, 9};
+
+std::array<std::array<int, 8>, BOARD_SIZE * BOARD_SIZE> Distances{};
+
+void PrecomputeDistances() {
+    for (int rank = 0; rank < BOARD_SIZE; rank++) {
+        for (int file = 0; file < BOARD_SIZE; file++) {
+            int left = file;
+            int right = BOARD_SIZE - file - 1;
+            int up = rank;
+            int down = BOARD_SIZE - rank - 1;
+
+            Distances[rank * BOARD_SIZE + file][0] = left;
+            Distances[rank * BOARD_SIZE + file][1] = right;
+            Distances[rank * BOARD_SIZE + file][2] = up;
+            Distances[rank * BOARD_SIZE + file][3] = down;
+            Distances[rank * BOARD_SIZE + file][4] = std::min(left, up);
+            Distances[rank * BOARD_SIZE + file][5] = std::min(right, up);
+            Distances[rank * BOARD_SIZE + file][6] = std::min(left, down);
+            Distances[rank * BOARD_SIZE + file][7] = std::min(right, down);
+        }
+    }
+}
+
+template<typename T>
+bool isIN(std::vector<T>& vec, T element) {
+    return std::find(vec.begin(), vec.end(), element) != vec.end();
+}
+
+
+class Board {
+public:
+    vector<Piece> pieces{};
+    vector<Move> moves{};
+    vector<Move> pseudo_moves{};
+    vector<Move> attack_moves{};
+    bool white_castleL = true;
+    bool white_castleR = true;
+    bool black_castleL = true;
+    bool black_castleR = true;
+    int passant_tile = -1;
+    int turn = Piece::White;
+
+    explicit Board(const string& fen) {
+        LoadFEN(fen);
+    }
+
+
+    void LoadFEN(const string &fen) {
+        unsigned int rank = 0, file = 0;
+
+        map<char, int> dict = {
+                {'p', Piece::Pawn},
+                {'n', Piece::Knight},
+                {'b', Piece::Bishop},
+                {'r', Piece::Rook},
+                {'k', Piece::King},
+                {'q', Piece::Queen}
+        };
+        int ID = 0;
+        for (const char &c: fen) {
+            if (c == '/') {
+                rank++;
+                file = 0;
+            } else {
+                if (isdigit(c)) {
+                    file += c - '0';
+                } else {
+                    int piece = dict[(char) tolower(c)];
+
+                    if(isupper(c)) pieces.emplace_back(rank * BOARD_SIZE + file, ID, Piece::White, piece);
+                    else pieces.emplace_back(rank * BOARD_SIZE + file, ID, Piece::Black, piece);
+
+                    ID++;
+                    file++;
+                }
+            }
+        }
+    }
+
+    // PSEUDO LEGAL MOVES GENERATION ----------
+    void SlidingMoves(int start, int startD, int endD, int max, bool mode = true) {
+        Piece startPiece = PieceOnPosition(start);
+
+        for(int i = startD; i < endD; i++) {
+            bool takedown = false;
+
+            for(int n = 0; n < min(Distances[start][i], max); n++) {
+                int end = start + Directions[i] * (n + 1);
+                Piece endPiece = PieceOnPosition(end);
+                if(endPiece.type == Piece::None && !takedown) pseudo_moves.emplace_back(start, end, startPiece, endPiece, false, false);
+                else if(!endPiece.CanMove(turn) && !takedown) {
+                    if(mode) pseudo_moves.emplace_back(start, end, startPiece, endPiece, false, false);
+                    attack_moves.emplace_back(start, end, startPiece, endPiece, false, false);
+                    takedown = true;
+                }
+                else break;
+            }
+        }
+    }
+
+    void PawnMoves(int start, bool white, int max, bool mode = true) {
+        array<int, 6> pawn_movement_indexes = {2, 4, 5, 3, 6, 7};
+        int i;
+        if(white) i = 0;
+        else i = 3;
+        Piece startPiece = PieceOnPosition(start);
+
+        for (int j = i; j < i + 3; j++) {
+            bool takedown = false;
+            for (int n = 0; n < std::min(Distances[start][pawn_movement_indexes[j]], max); n++) {
+                int endPosition = start + Directions[pawn_movement_indexes[j]] * (n + 1);
+                Piece endPiece = PieceOnPosition(endPosition);
+
+                if ((abs(Directions[pawn_movement_indexes[j]]) == 9 || abs(Directions[pawn_movement_indexes[j]]) == 7) &&
+                    n == 0) {
+                    if (!endPiece.CanMove(turn) && !takedown && endPiece.type != Piece::None) {
+                        if(mode) pseudo_moves.emplace_back(start, endPosition, startPiece, endPiece, false, false);
+                        attack_moves.emplace_back(start, endPosition, startPiece, endPiece, false, false);
+                        takedown = true;
+                    } else if (endPiece.type == Piece::None && passant_tile == endPosition) {
+                        if(mode) pseudo_moves.emplace_back(start, endPosition, startPiece, endPiece, false, true);
+                        attack_moves.emplace_back(start, endPosition, startPiece, endPiece, false, true);
+                        takedown = true;
+                    } else break;
+                } else {
+                    if (endPiece.type == Piece::None) {
+                        if(mode) pseudo_moves.emplace_back(start, endPosition, startPiece, endPiece, false, false);
+                        attack_moves.emplace_back(start, endPosition, startPiece, endPiece, false, false);
+                    }
+                    else break;
+                }
+            }
+        }
+    }
+
+    void KnightMoves(int start, bool mode = true) {
+        vector<int> jumps = {start - 17, start - 15, start - 10, start - 6,
+                             start + 17, start + 15, start + 10, start + 6};
+
+        Piece startPiece = PieceOnPosition(start);
+
+        for(int jump : jumps) {
+            Piece jumpPiece = PieceOnPosition(jump);
+            if (jump >= 0 && jump <= 63 && !jumpPiece.CanMove(turn)) {
+                if(mode) pseudo_moves.emplace_back(start, jump, startPiece, jumpPiece, false, false);
+                attack_moves.emplace_back(start, jump, startPiece, jumpPiece, false, false);
+            }
+        }
+    }
+
+    void CastleMoves(int start, bool mode = true) {
+        Piece startPiece = PieceOnPosition(start);
+        if (turn == Piece::White && PieceOnPosition(62).type == Piece::None && PieceOnPosition(61).type == Piece::None &&
+                PieceOnPosition(63).type == Piece::Rook && white_castleR) {
+            Piece endPiece = PieceOnPosition(63);
+            if(mode) pseudo_moves.emplace_back(start, 63, startPiece, endPiece, true, false);
+            attack_moves.emplace_back(start, 63, startPiece, endPiece, true, false);
+        }
+        if (turn == Piece::White && PieceOnPosition(57).type == Piece::None && PieceOnPosition(58).type == Piece::None &&
+            PieceOnPosition(56).type == Piece::Rook && white_castleL) {
+            Piece endPiece = PieceOnPosition(56);
+            if(mode) pseudo_moves.emplace_back(start, 56, startPiece, endPiece, true, false);
+            attack_moves.emplace_back(start, 56, startPiece, endPiece, true, false);
+        }
+        if (turn == Piece::Black && PieceOnPosition(1).type == Piece::None && PieceOnPosition(2).type == Piece::None &&
+            PieceOnPosition(0).type == Piece::Rook && black_castleL) {
+            Piece endPiece = PieceOnPosition(0);
+            if(mode) pseudo_moves.emplace_back(start, 0, startPiece, endPiece, true, false);
+            attack_moves.emplace_back(start, 0, startPiece, endPiece, true, false);
+        }
+        if (turn == Piece::Black && PieceOnPosition(5).type == Piece::None && PieceOnPosition(6).type == Piece::None &&
+            PieceOnPosition(7).type == Piece::Rook && black_castleR) {
+            Piece endPiece = PieceOnPosition(7);
+            if(mode) pseudo_moves.emplace_back(start, 7, startPiece, endPiece, true, false);
+            attack_moves.emplace_back(start, 7, startPiece, endPiece, true, false);
+        }
+    }
+
+    void GeneratePseudoLegalMoves() {
+        for (int startPosition = 0; startPosition < BOARD_SIZE * BOARD_SIZE; startPosition++) {
+            Piece startPiece = PieceOnPosition(startPosition);
+            if(startPiece.CanMove(turn)) {
+                switch (startPiece.type) {
+                    case Piece::Queen:
+                        SlidingMoves(startPosition, 0, 8, INT_MAX);
+                        break;
+                    case Piece::Rook:
+                        SlidingMoves(startPosition, 0, 4, INT_MAX);
+                        break;
+                    case Piece::Bishop:
+                        SlidingMoves(startPosition, 4, 8, INT_MAX);
+                        break;
+                    case Piece::King:
+                        SlidingMoves(startPosition, 0, 8, 1);
+                        CastleMoves(startPosition);
+                        break;
+                    case Piece::Knight:
+                        KnightMoves(startPosition);
+                        break;
+                    case Piece::Pawn:
+                        if(turn == Piece::Black) {
+                            if(startPosition / BOARD_SIZE == 1) PawnMoves(startPosition, false, 2);
+                            else PawnMoves(startPosition, false, 1);
+                        }else {
+                            if(startPosition / BOARD_SIZE == 6) PawnMoves(startPosition, true, 2);
+                            else PawnMoves(startPosition, true, 1);
+                        }
+                        break;
+                }
+            }
+        }
+    }
+    // -------------
+
+    Piece PieceOnPosition(int pos) {
+        for(Piece& p : pieces) {
+            if(p.position == pos && p.alive) return p;
+        }
+        return {pos, -1, -1, Piece::None, false};
+    }
+
+    Piece PieceOnPositionDEAD(int pos) {
+        for(Piece& p : pieces) {
+            if(p.position == pos && !p.alive) return p;
+        }
+        return {pos, -1, -1, Piece::None, false};
+    }
+
+    bool attacks(Piece p, int pos) {
+        if(p.CanMove(turn)) {
+            switch (p.type) {
+                case Piece::Queen:
+                    SlidingMoves(p.position, 0, 8, INT_MAX, false);
+                    break;
+                case Piece::Rook:
+                    SlidingMoves(p.position, 0, 4, INT_MAX, false);
+                    break;
+                case Piece::Bishop:
+                    SlidingMoves(p.position, 4, 8, INT_MAX, false);
+                    break;
+                case Piece::King:
+                    SlidingMoves(p.position, 0, 8, 1, false);
+                    CastleMoves(p.position, false);
+                    break;
+                case Piece::Knight:
+                    KnightMoves(p.position, false);
+                    break;
+                case Piece::Pawn:
+                    if(turn == Piece::Black) {
+                        if(p.position / BOARD_SIZE == 1) PawnMoves(p.position, false, 2, false);
+                        else PawnMoves(p.position, false, 1, false);
+                    }else {
+                        if(p.position / BOARD_SIZE == 6) PawnMoves(p.position, true, 2, false);
+                        else PawnMoves(p.position, true, 1, false);
+                    }
+                    break;
+            }
+            for(Move& mv : attack_moves) {
+                if(mv.end == pos) return true;
+            }
+        }
+        return false;
+    }
+
+    bool MakeMove(Move move, bool mode = true) {
+        if(mode) {
+            moves.clear();
+            pseudo_moves.clear();
+            attack_moves.clear();
+            GeneratePseudoLegalMoves();
+            if(!isIN<Move>(pseudo_moves, move)) return false;
+        }
+
+        if(move.castle) {
+            for(Piece& piece : pieces) {
+                if(piece.ID == move.startPiece.ID) {
+                    int copy = move.end;
+                    if(move.start - move.end < 0) {
+                        move.end = move.start + 2;
+                    } else {
+                        move.end = move.start - 2;
+                    }
+                    piece.MovePiece(move);
+                    move.end = copy;
+                }
+                else if(piece.ID == move.endPiece.ID) {
+                    int copy = move.end;
+                    if(move.start - move.end < 0) {
+                        move.end = move.start + 1;
+                    } else {
+                        move.end = move.start - 1;
+                    }
+                    piece.MovePiece(move);
+                    move.end = copy;
+                }
+            }
+        }
+        else if(move.passant) {
+            for(Piece& piece : pieces) {
+                if(piece.ID == move.startPiece.ID) piece.MovePiece(move);
+                else if(move.startPiece.color == Piece::White && piece.ID == PieceOnPosition(move.end + 8).ID) {
+                    piece.KillPiece();
+                } else if(move.startPiece.color == Piece::Black && piece.ID == PieceOnPosition(move.end - 8).ID) {
+                    piece.KillPiece();
+                }
+            }
+        }
+        else {
+            for(Piece& piece : pieces) {
+                if(piece.ID == move.startPiece.ID) piece.MovePiece(move);
+                else if(piece.ID == move.endPiece.ID && move.endPiece.type != Piece::None) piece.KillPiece();
+            }
+        }
+
+        if(move.startPiece.type == Piece::King && move.startPiece.color == Piece::White) {
+            white_castleL = false;
+            white_castleR = false;
+        } else if(move.startPiece.type == Piece::King && move.startPiece.color == Piece::Black) {
+            black_castleL = false;
+            black_castleR = false;
+        } else if(move.startPiece.type == Piece::Rook) {
+            if(move.start == 0) black_castleL = false;
+            if(move.start == 7) black_castleR = false;
+            if(move.start == 63) white_castleR = false;
+            if(move.start == 56) white_castleL = false;
+        }
+        if(move.endPiece.type == Piece::Rook) {
+            if(move.end == 0) black_castleL = false;
+            if(move.end == 7) black_castleR = false;
+            if(move.end == 63) white_castleR = false;
+            if(move.end == 56) white_castleL = false;
+        }
+
+        bool white_skip = (move.startPiece.color | move.startPiece.type) == (Piece::White | Piece::Pawn)  &&
+                          (move.start / BOARD_SIZE == 6 && move.end / BOARD_SIZE == 4);
+        bool black_skip = (move.startPiece.color | move.startPiece.type) == (Piece::Black | Piece::Pawn) &&
+                          (move.start / BOARD_SIZE == 1 && move.end / BOARD_SIZE == 3);
+
+        // Check for possible en passant (for the next round)
+        if (black_skip) passant_tile = move.end - 8;
+        else if (white_skip) passant_tile = move.end + 8;
+        else passant_tile = -1;
+
+        // Change turn
+        turn = (turn == Piece::White) ? Piece::Black : Piece::White;
+
+        return true;
+    }
+
+    void UnMakeMove(Move move) {
+
+
+        // Change turn
+        turn = (turn == Piece::White) ? Piece::Black : Piece::White;
+
+
+
+
+
+
+    }
+};
