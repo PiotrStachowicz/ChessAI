@@ -1,3 +1,4 @@
+// Piotr Stachowicz
 #include "Objects/Board/Board.hpp"
 using namespace std;
 
@@ -115,10 +116,27 @@ void game() {
 
                     Piece* start_piece = board.piece_on_position(start);
                     Piece* end_piece = board.piece_on_position(end);
-                    Move move(start, end, start_piece, end_piece);
+                    Piece* possible_passant1 = board.piece_on_position(start - 1);
+                    Piece* possible_passant2 = board.piece_on_position(start + 1);
 
-                    if(board.make_move(move)) {
-                        history.push_back(move);
+                    if(possible_passant1->type != Piece::none && possible_passant1->move_count == 1 && start_piece->type == Piece::pawn && end_piece->type == Piece::none && std::abs((int)end - start) != 8) {
+                        Move move(start, end, start_piece, possible_passant1);
+
+                        if(board.make_move(move)) {
+                            history.push_back(move);
+                        }
+                    } else if(possible_passant2->type != Piece::none && possible_passant2->move_count == 1 && start_piece->type == Piece::pawn && end_piece->type == Piece::none && std::abs((int)end - start) != 8) {
+                        Move move(start, end, start_piece, possible_passant2);
+
+                        if(board.make_move(move)) {
+                            history.push_back(move);
+                        }
+                    } else {
+                        Move move(start, end, start_piece, end_piece);
+
+                        if(board.make_move(move)) {
+                            history.push_back(move);
+                        }
                     }
 
                     start = 64;

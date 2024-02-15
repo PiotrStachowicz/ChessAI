@@ -5,6 +5,10 @@
 #include "../../Settings/Settings.hpp"
 #include "../Move/Move.hpp"
 
+class Move;
+class Board;
+
+
 class Piece {
 public:
     static const uint8_t none;

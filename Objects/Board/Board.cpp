@@ -44,12 +44,46 @@ Piece* Board::piece_on_position(uint16_t position) {
 }
 
 bool Board::make_move(Move move) {
-    move.start_piece->move(move.end);
-    move.end_piece->kill();
+    // Check if legal
+    std::vector<Move> pseudo_legal = Move::generate_pseudo_legal_moves(*this);
+
+    if(!element_in<Move>(pseudo_legal, move)) return false;
+
+    // Castle Move Pieces
+    if(move.if_castle(turn)) {
+        int off1 = move.end == 63 || move.end == 7 ? 2 : -3;
+        int off2 = move.end == 63 || move.end == 7 ? 1 : -2;
+
+        move.start_piece->move(move.start + off1);
+        move.end_piece->move(move.start + off2);
+
+        move.end_piece->move_count++;
+    }
+    // Normal & En Passant Move Pieces
+    else {
+        move.start_piece->move(move.end);
+        move.end_piece->kill();
+    }
+
+    move.start_piece->move_count++;
+
+    // Change Turn
+    turn = not turn;
+
     return true;
 }
 
 void Board::un_move(Move move) {
+    move.start_piece->move_count--;
+    move.end_piece->move_count--;
+
     move.start_piece->move(move.start);
-    move.end_piece->revive();
+    if(move.if_castle(move.start_piece->color)) {
+        move.end_piece->move(move.end);
+    }else {
+        move.end_piece->move_count++;
+        move.end_piece->revive();
+    }
+
+    turn = not turn;
 }

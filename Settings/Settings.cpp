@@ -29,11 +29,6 @@ void compute_distances() {
     }
 }
 
-template<typename T>
-bool element_in(std::vector<T> &vec, T element) {
-    return std::find(vec.begin(), vec.end(), element) != vec.end();
-}
-
 const sf::Color Green(124, 174, 104);
 const sf::Color Cream(240, 217, 181);
 

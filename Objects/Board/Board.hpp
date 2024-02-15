@@ -6,6 +6,13 @@
 #include "../Move/Move.hpp"
 #include "../Piece/Piece.hpp"
 
+class Move;
+class Piece;
+
+template<typename T>
+bool element_in(std::vector<T> &vec, T element) {
+    return std::find(vec.begin(), vec.end(), element) != vec.end();
+}
 
 class Board {
 public:
