@@ -15,6 +15,9 @@ add_executable(Chess
         Objects/Move/Move.cpp
         Settings/Settings.hpp
         Settings/Settings.cpp
+        "Models/Easy/BOT#1(RANDOM).hpp"
+        "Models/Easy/BOT#2(MINIMAX).hpp"
+        Models/Minimax.hpp
 )
 
 set(SFML_STATIC_LIBRARIES TRUE)

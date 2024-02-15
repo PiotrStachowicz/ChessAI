@@ -21,11 +21,12 @@ public:
 public:
     uint16_t position;
     uint8_t type;
+    uint8_t promotion_type = Piece::none;
     bool color;
     bool alive;
     uint32_t move_count;
 public:
-    Piece(uint16_t position);
+    explicit Piece(uint16_t position);
 
     Piece(uint16_t position, uint8_t type, bool color, bool alive, bool move_count);
 

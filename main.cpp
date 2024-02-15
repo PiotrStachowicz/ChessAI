@@ -1,5 +1,7 @@
 // Piotr Stachowicz
 #include "Objects/Board/Board.hpp"
+#include "Models/Easy/BOT#1(RANDOM).hpp"
+#include "Models/Easy/BOT#2(MINIMAX).hpp"
 using namespace std;
 
 // Textures
@@ -54,21 +56,24 @@ void load_textures() {
     bBishop = sf::Sprite(bBishopTexture);
 
     // Scale
-    wKing.setScale(0.5f, 0.5f);
-    bKing.setScale(0.5f, 0.5f);
-    wQueen.setScale(0.5f, 0.5f);
-    bQueen.setScale(0.5f, 0.5f);
-    wPawn.setScale(0.5f, 0.5f);
-    bPawn.setScale(0.5f, 0.5f);
-    wKnight.setScale(0.5f, 0.5f);
-    bKnight.setScale(0.5f, 0.5f);
-    wRook.setScale(0.5f, 0.5f);
-    bRook.setScale(0.5f, 0.5f);
-    wBishop.setScale(0.5f, 0.5f);
-    bBishop.setScale(0.5f, 0.5f);
+    float scale = 0.7;
+    wKing.setScale(scale, scale);
+    bKing.setScale(scale, scale);
+    wQueen.setScale(scale, scale);
+    bQueen.setScale(scale, scale);
+    wPawn.setScale(scale, scale);
+    bPawn.setScale(scale, scale);
+    wKnight.setScale(scale, scale);
+    bKnight.setScale(scale, scale);
+    wRook.setScale(scale, scale);
+    bRook.setScale(scale, scale);
+    wBishop.setScale(scale, scale);
+    bBishop.setScale(scale, scale);
 }
 
 void game() {
+
+    array<int, 64> enlighted_tiles{0};
 
     // Map textures
     map<pair<uint8_t, bool>, sf::Sprite> textures = {
@@ -96,6 +101,10 @@ void game() {
     sf::RectangleShape rectangle(sf::Vector2f((float)size, (float)size));
     uint16_t start = 64;
     uintptr_t end;
+    vector<Move> legal{};
+
+    // Bot
+    MinimaxBot sad_bot{};
 
     // Main Game Loop
     while (window.isOpen()) {
@@ -122,27 +131,39 @@ void game() {
                     if(possible_passant1->type != Piece::none && possible_passant1->move_count == 1 && start_piece->type == Piece::pawn && end_piece->type == Piece::none && std::abs((int)end - start) != 8) {
                         Move move(start, end, start_piece, possible_passant1);
 
-                        if(board.make_move(move)) {
+                        if(board.make_move(move, legal)) {
+                            sad_bot.generate_move(board);
                             history.push_back(move);
                         }
                     } else if(possible_passant2->type != Piece::none && possible_passant2->move_count == 1 && start_piece->type == Piece::pawn && end_piece->type == Piece::none && std::abs((int)end - start) != 8) {
                         Move move(start, end, start_piece, possible_passant2);
 
-                        if(board.make_move(move)) {
+                        if(board.make_move(move, legal)) {
+                            sad_bot.generate_move(board);
                             history.push_back(move);
                         }
                     } else {
                         Move move(start, end, start_piece, end_piece);
 
-                        if(board.make_move(move)) {
+                        if(board.make_move(move, legal)) {
+                            sad_bot.generate_move(board);
                             history.push_back(move);
                         }
                     }
-
+                    for(int i = 0; i < 64; i++) enlighted_tiles[i] = 0;
+                    legal.clear();
                     start = 64;
+                    if(board.end() != 0) {
+                        board = Board(Start_FEN);
+                    }
                 } else {
                     sf::Vector2<int> pos = sf::Mouse::getPosition(window);
                     start = pos.y / size * 8 + pos.x / size;
+                    legal = Move::generate_legal_moves(board);
+                    for(Move& move : legal) {
+                        if(move.start == start) enlighted_tiles[move.end] = 2;
+                    }
+                    enlighted_tiles[start] = 1;
                 }
             }
         }
@@ -153,13 +174,15 @@ void game() {
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 rectangle.setPosition((float) j * (float)size, (float) i * (float)size);
-                if ((i + j) % 2 == 0) rectangle.setFillColor(Green);
+                if(enlighted_tiles[i * 8 + j] == 2) rectangle.setFillColor(Redish);
+                else if(enlighted_tiles[i * 8 + j] == 1) rectangle.setFillColor(Orangeish);
+                else if ((i + j) % 2 == 0) rectangle.setFillColor(Green);
                 else rectangle.setFillColor(Cream);
 
                 window.draw(rectangle);
                 Piece* piece = board.piece_on_position(i * 8 + j);
 
-                textures[{piece->type, piece->color}].setPosition(j * (float)size + 0.2 * size, i * size + 0.2 * size);
+                textures[{piece->type, piece->color}].setPosition(j * (float)size + 0.15 * size, i * size + 0.15 * size);
                 window.draw(textures[{piece->type, piece->color}]);
             }
         }

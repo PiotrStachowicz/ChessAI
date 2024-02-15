@@ -27,9 +27,11 @@ public:
 
     Piece* piece_on_position(uint16_t position);
 
-    bool make_move(Move move);
+    bool make_move(Move move, std::vector<Move> legal);
+
     void un_move(Move move);
 
+    int end();
 };
 
 

@@ -11,10 +11,11 @@
 #include <array>
 #include <deque>
 #include <cstdint>
+#include <random>
 
 // Game Settings
-#define WIDTH 800
-#define HEIGHT 800
+#define WIDTH 1000
+#define HEIGHT 1000
 #define Start_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 
 extern std::array<int, 8> directions;
@@ -23,5 +24,7 @@ extern std::array<std::array<int, 8>, 8 * 8> distances;
 extern void compute_distances();
 extern const sf::Color Green;
 extern const sf::Color Cream;
+extern const sf::Color Redish;
+extern const sf::Color Orangeish;
 
 #endif //CHESS_SETTINGS_HPP

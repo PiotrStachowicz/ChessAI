@@ -43,12 +43,8 @@ Piece* Board::piece_on_position(uint16_t position) {
     return &pieces[pieces.size()-1];
 }
 
-bool Board::make_move(Move move) {
-    // Check if legal
-    std::vector<Move> pseudo_legal = Move::generate_pseudo_legal_moves(*this);
-
-    if(!element_in<Move>(pseudo_legal, move)) return false;
-
+bool Board::make_move(Move move, std::vector<Move> legal) {
+    if(!element_in<Move>(legal, move)) return false;
     // Castle Move Pieces
     if(move.if_castle(turn)) {
         int off1 = move.end == 63 || move.end == 7 ? 2 : -3;
@@ -58,6 +54,14 @@ bool Board::make_move(Move move) {
         move.end_piece->move(move.start + off2);
 
         move.end_piece->move_count++;
+    }
+    // Promotion
+    else if(move.start_piece->type == Piece::pawn && (move.start_piece->color && move.end / 8 == 0) || (!move.start_piece->color && move.end / 8 == 8)) {
+        move.start_piece->move(move.end);
+        move.end_piece->kill();
+        // hard coded queen promotion...
+        move.start_piece->type = Piece::queen;
+        move.start_piece->promotion_type = Piece::pawn;
     }
     // Normal & En Passant Move Pieces
     else {
@@ -80,10 +84,26 @@ void Board::un_move(Move move) {
     move.start_piece->move(move.start);
     if(move.if_castle(move.start_piece->color)) {
         move.end_piece->move(move.end);
-    }else {
+    }
+    else if(move.start_piece->promotion_type == Piece::pawn && (move.start_piece->color && move.end / 8 == 0 && move.start / 8 == 1) ||
+        (!move.start_piece->color && move.end / 8 == 8 && move.start / 8 == 7)) {
+
+        move.start_piece->move(move.start);
+        move.end_piece->revive();
+        move.start_piece->type = Piece::pawn;
+    }
+    else {
         move.end_piece->move_count++;
         move.end_piece->revive();
     }
 
     turn = not turn;
+}
+
+// 0 not ended | 1 white lost | 2 black lost
+int Board::end() {
+    if(Move::generate_legal_moves(*this).empty()) {
+        return turn ? 1 : 2;
+    }
+    return 0;
 }

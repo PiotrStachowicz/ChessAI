@@ -26,6 +26,8 @@ public:
 
     [[nodiscard]] bool takedown() const;
 
+    static std::vector<Move> generate_legal_moves(Board& board);
+
     static std::vector<Move> generate_pseudo_legal_moves(Board& board);
 
     static std::vector<Move> slide_move(Board &board, int start, Piece* start_piece, int start_direction, int end_direction, int max);
@@ -35,6 +37,8 @@ public:
     static std::vector<Move> pawn_move(Board &board, int start, Piece* start_piece);
 
     static std::vector<Move> castle_move(Board &board, int start, Piece* start_piece);
+
+    static bool king_attacked(const std::vector<Move>& moves, Piece* king);
 
     bool operator==(const Move &move) const;
 };

@@ -106,10 +106,19 @@ std::vector<Move> Move::jump_move(Board &board, int start, Piece* start_piece) {
     std::vector<int> jumps = {start - 17, start - 15, start - 10, start - 6,
                          start + 17, start + 15, start + 10, start + 6};
 
+    int start_file = start % 8;
+    int start_rank = start / 8;
+
     for(int jump : jumps) {
         Piece* end_piece = board.piece_on_position(jump);
 
-        if (jump >= 0 && jump <= 63 && !end_piece->can_move(board.turn)) {
+        int dest_file = jump % 8;
+        int dest_rank = jump / 8;
+
+        int file_diff = abs(dest_file - start_file);
+        int rank_diff = abs(dest_rank - start_rank);
+
+        if (((file_diff == 1 && rank_diff == 2) || (file_diff == 2 && rank_diff == 1)) && jump >= 0 && jump <= 63 && (!end_piece->can_move(board.turn) || end_piece->type == Piece::none)) {
             result.emplace_back(start, jump, start_piece, end_piece);
         }
     }
@@ -130,27 +139,27 @@ std::vector<Move> Move::pawn_move(Board &board, int start, Piece* start_piece) {
         bool takedown = false;
 
         for (int n = 0; n < std::min(distances[start][pawn_movement_indexes[i]], max); n++) {
-            int end = start + directions[pawn_movement_indexes[i]] * (n + 1);
+            int direction = directions[pawn_movement_indexes[i]];
+            int end = start + direction * (n + 1);
             Piece* end_piece = board.piece_on_position(end);
 
-            if ((abs(directions[pawn_movement_indexes[i]]) == 9 || abs(directions[pawn_movement_indexes[i]]) == 7) && n == 0) {
+            if ((abs(direction) == 9 || abs(direction) == 7) && n == 0) {
                 if (!end_piece->can_move(board.turn) && !takedown && end_piece->type != Piece::none) {
                     result.emplace_back(start, end, start_piece, end_piece);
                     takedown = true;
                 } else if (end_piece->type == Piece::none && !takedown) {
                     Piece* en_passant_piece = board.piece_on_position(start_piece->color ? end + 8 : end - 8);
 
-                    if(en_passant_piece->alive && en_passant_piece->move_count == 1 && !en_passant_piece->can_move(board.turn)) {
+                    if(en_passant_piece->alive && en_passant_piece->type == Piece::pawn && en_passant_piece->move_count == 1 && !en_passant_piece->can_move(board.turn)) {
                         result.emplace_back(start, end, start_piece, en_passant_piece);
                         takedown = true;
                     }
-                } else break;
-            } else {
-                if (end_piece->type == Piece::none && !takedown) {
-                    result.emplace_back(start, end, start_piece, end_piece);
                 }
                 else break;
+            } else if (end_piece->type == Piece::none && !takedown && abs(direction) == 8) {
+                result.emplace_back(start, end, start_piece, end_piece);
             }
+            else break;
         }
     }
 
@@ -177,4 +186,36 @@ std::vector<Move> Move::castle_move(Board &board, int start, Piece* start_piece)
     }
 
     return result;
+}
+
+std::vector<Move> Move::generate_legal_moves(Board &board) {
+    std::vector<Move> pseudo_legal = generate_pseudo_legal_moves(board);
+    std::vector<Move> legal{};
+
+    Piece* king;
+    for(Piece& piece : board.pieces) {
+        if(piece.type == Piece::king && piece.color == board.turn) king = &piece;
+    }
+
+    // Very slow...
+    for(Move& move : pseudo_legal) {
+        if(move.if_castle(board.turn)) {
+            board.make_move(move, pseudo_legal);
+            std::vector<Move> potential_attack = generate_pseudo_legal_moves(board);
+            if(!king_attacked(potential_attack, king) && !king_attacked(potential_attack, move.end_piece)) legal.push_back(move);
+            board.un_move(move);
+        }
+        else {
+            board.make_move(move, pseudo_legal);
+            if(!king_attacked(generate_pseudo_legal_moves(board), king)) legal.push_back(move);
+            board.un_move(move);
+        }
+    }
+
+    return legal;
+}
+
+bool Move::king_attacked(const std::vector<Move>& moves, Piece* king) {
+    for (Move move: moves) if (move.end_piece == king) return true;
+    return false;
 }

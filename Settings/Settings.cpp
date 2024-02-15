@@ -31,4 +31,5 @@ void compute_distances() {
 
 const sf::Color Green(124, 174, 104);
 const sf::Color Cream(240, 217, 181);
-
+const sf::Color Redish(255, 99, 71);
+const sf::Color Orangeish(255, 165, 0);
