@@ -2,9 +2,12 @@
 #ifndef CHESS_PIECE_HPP
 #define CHESS_PIECE_HPP
 #pragma once
+
 #include "../../Settings/Settings.hpp"
 #include "../Move/Move.hpp"
 
+
+// Pre-define for linker
 class Move;
 class Board;
 
@@ -22,13 +25,13 @@ public:
     uint16_t position;
     uint8_t type;
     uint8_t promotion_type = Piece::none;
-    bool color;
-    bool alive;
     uint32_t move_count;
+    bool alive;
+    bool color;
 public:
     explicit Piece(uint16_t position);
 
-    Piece(uint16_t position, uint8_t type, bool color, bool alive, bool move_count);
+    Piece(uint16_t position, uint8_t type, bool color, bool alive);
 
     [[nodiscard]] bool can_move(bool turn) const;
 

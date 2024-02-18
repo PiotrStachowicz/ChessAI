@@ -2,7 +2,7 @@
 #include "Settings.hpp"
 
 
-// left-right-up-down-tl-tr-bl-br
+// left | right | up | down | top-left | top-right | bottom-left | bottom-right
 std::array<int, 8> directions = {-1, 1, -8, 8, -9, -7, 7, 9};
 
 std::array<std::array<int, 8>, 8 * 8> distances{};
@@ -29,6 +29,7 @@ void compute_distances() {
     }
 }
 
+// Colors
 const sf::Color Green(124, 174, 104);
 const sf::Color Cream(240, 217, 181);
 const sf::Color Redish(255, 99, 71);

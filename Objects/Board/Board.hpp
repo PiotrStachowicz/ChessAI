@@ -14,6 +14,8 @@ bool element_in(std::vector<T> &vec, T element) {
     return std::find(vec.begin(), vec.end(), element) != vec.end();
 }
 
+enum state { win, lose, nothing };
+
 class Board {
 public:
     std::vector<Piece> pieces;
@@ -27,11 +29,11 @@ public:
 
     Piece* piece_on_position(uint16_t position);
 
-    bool make_move(Move move, std::vector<Move> legal);
+    bool make_move(Move& move, std::vector<Move>& legal);
 
-    void un_move(Move move);
+    void undo_move(Move& move);
 
-    int end();
+    state end();
 };
 
 

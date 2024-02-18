@@ -16,12 +16,14 @@
 // Game Settings
 #define WIDTH 1000
 #define HEIGHT 1000
-#define Start_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+#define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 
 extern std::array<int, 8> directions;
 extern std::array<std::array<int, 8>, 8 * 8> distances;
 
 extern void compute_distances();
+
+// Colors
 extern const sf::Color Green;
 extern const sf::Color Cream;
 extern const sf::Color Redish;
